@@ -80,7 +80,7 @@ exports.performEndOfWeek = () => {
 
 }
 
-function insertWithPromise = (collection, userId, prize) => {
+var insertWithPromise = (collection, userId, prize) => {
  return new Promise( (resolve, reject) => {
   collection.insert({ 'userId': userId, 'prize': prize}, (err, result) => {
    return resolve()
