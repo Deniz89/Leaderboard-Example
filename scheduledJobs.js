@@ -35,7 +35,8 @@ exports.performEndOfWeek = () => {
    var totalScore = response * (2/100)
 
    redis.zrevrangebyscore(['leaderboard', '+inf', '-inf', 'LIMIT', '0' ,'100'], (err, top100list) => {
-    dbHelper.getCollection('leaderboard', 'PrizeInfo').then( (collResp) => {
+    var today = moment().format('YYYY.MM.DD')
+    dbHelper.getCollection('leaderboard', 'PrizeInfo.' + today).then( (collResp) => {
 
      var client = collResp.client
      var collection = collResp.collection
