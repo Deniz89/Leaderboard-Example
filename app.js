@@ -20,22 +20,6 @@ const redis = redisClient(redisPort, redisUrl)
 const app = express()
 const url = `mongodb://localhost:27017`
 
-// OBSOLETE
-app.get('/', (req, res) => {
- MongoClient.connect(url, function(err, client) {
-  if(err) throw err;
-
-  var db = client.db('leaderboard');
-
-  var collection = db.collection('UserInfo');
-
-  collection.find({userName:"111"}, (err, response) => {
-   console.log(util.inspect(response))
-  })
- })
- res.send('Hello World!')
-});
-
 // used to create db between lo and hi
 // e.g. lo is 1 and hi is 300000
 app.get('/createdb', (req, res) => {
@@ -86,24 +70,6 @@ app.get('/migrateToRedis', (req, res) => {
  res.send('Check redis and console.')
 
 })
-
-// OBSOLETE, for testing purp.
-app.get('/trial2', (req, res) => {
-  axios.get( 'http://127.0.0.1:8080/migrateToRedis?lo=' + 1900001 + '&hi=' + 2000000).then(() => {
-   console.log('send successfully.')
-   res.send("OK.")
-  }).catch((err) => {
-   console.log('err: ' + err)
-  })
-})
-
-// OBSOLETE, for testing purp.
-app.get('/trial3', (req, res) => {
- redis.zincrby("leaderboard", "15", "9999280", (err, result) => {
-  res.send(JSON.stringify(result))
- })
-})
-
 
 // used to call migrateToRedis end point in batches
 // should be moved to cron, but used in the beginning only
@@ -157,7 +123,7 @@ app.get('/getNeighbours', (req, res) => {
  rankUtil.getNeighboursByUserId(userId).then( (resp) => {
 
   res.send(resp)
-})
+ })
 
 })
 
