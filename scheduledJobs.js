@@ -32,7 +32,7 @@ exports.performEndOfWeek = () => {
 
   redis.get("totalScore", (err, response) => {
 
-   var totalScore = response
+   var totalScore = response * (2/100)
 
    redis.zrevrangebyscore(['leaderboard', '+inf', '-inf', 'LIMIT', '0' ,'100'], (err, top100list) => {
     dbHelper.getCollection('leaderboard', 'PrizeInfo').then( (collResp) => {
@@ -42,6 +42,9 @@ exports.performEndOfWeek = () => {
 
      var promiseList = []
 
+     // TODO the inserts below should be replaced with updateOne with upsert s 
+     // http://mongodb.github.io/node-mongodb-native/3.0/tutorials/crud/
+     
      for(let i=0;i<top100list.length;i++) {
       if(i==0) {
        promiseList.push( insertWithPromise(collection, top100list[0],  (totalScore * (20/100)) ) )
