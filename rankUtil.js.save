@@ -1,0 +1,149 @@
+var Promise = require('promise');
+var redisClient = require('redis').createClient
+var redis = redisClient(6379, 'leaderboard.va0tug.ng.0001.use2.cache.amazonaws.com')
+var MongoClient = require('mongodb').MongoClient;
+var moment = require('moment');
+moment().format();
+
+var dbHelper = require('./dbHelper.js')
+
+var url = `mongodb://localhost:27017`
+
+var getRankChange = (userId, todaysRank) => {
+ return new Promise( (resolve, reject) => {
+
+  redis.zrevrank("leaderboard_yesterday", userId, (err, resp) => {
+   if(err) return reject(err)
+
+   var yesterdayRank = resp
+
+  //  console.log("getRankChange, userId: " + userId + ", prevRank: " + yesterdayRank)
+
+   if(todaysRank) {
+    return resolve( {userId: userId, rank: todaysRank, rankChange: yesterdaysRank - todaysRank} )
+   }
+   else
+   {
+    redis.zrevrank("leaderboard", userId, (err, response) => {
+     if(err) return reject(err)
+
+     var currentRank = response
+
+  //    console.log("getRankChange, userId: " + userId + ", currRank: " + currentRank)
+
+     return resolve( {userId: userId, rank: currentRank, rankChange: yesterdayRank - currentRank} )
+
+    })
+   }
+
+  })
+ })
+}
+
+
+// gets the top 100 players with their scores and usernames
+exports.getTop100 = () => {
+ return new Promise( (resolve, reject) => {
+  redis.zrevrangebyscore(['leaderboard', '+inf', '-inf', 'LIMIT', '0' ,'100'], (err, response) => {
+   if(err) return reject(err)
+
+   if(!response) return reject("Response is null!!!")
+
+   // in order to get rank changes of the users
+   var promiseList = []
+
+   console.log("getTop100: ranking: " + JSON.stringify(response) )
+
+   for(let i=0;i<response.length;i++) {
+    promiseList.push(getRankChange(response[i]))
+    response[i] = parseInt(response[i],10)
+   }
+
+   Promise.all(promiseList).then( (rankArr) => {
+
+    console.log("rankArr: " + JSON.stringify(rankArr))
+
+    var rankLookUp = {}
+
+    for(let i=0;i<rankArr.length;i++) {
+     rankLookUp[rankArr[i].userId] = {rank:}
+    }
+
+    dbHelper.getCollection('leaderboard', 'UserInfo').then( (collResp) => {
+
+     var client = collResp.client
+     var collection = collResp.collection
+
+     collection.find({"userId" : {$in : response}})
+      .project( {'_id':0, 'userId': 1, 'userName': 1, 'score': 1, 'age': 1} )
+      .toArray( (err, result) => {
+
+       if(err) return reject(err)
+
+       
+
+       for(let i=0;i<result.length;i++) {
+
+        result[i].rankChange = rankArr[i]
+       }
+
+       resolve(result)
+
+     })
+    })
+   })
+  })
+ })
+}
+
+// gets the username
+exports.getNeighbours = (userName) => {
+
+ return new Promise( (resolve, reject) => {
+
+  dbHelper.getCollection('leaderboard', 'UserInfo').then( (collResp) => {
+
+   var client = collResp.client
+   var collection = collResp.collection
+
+   collection.findOne({userName: userName}, (err, resp) => {
+    if(err) return reject(err)
+
+    if(!resp) return reject('Response from db is null, userName: ' + userName)
+
+    var myUser = resp
+
+    redis.zrevrank('leaderboard', parseInt(myUser.userId) , (err, response) => {
+     if(err) return reject(err)
+
+     // TODO check if this is correct
+     var myRank = response
+
+     if(myRank <= 99) { return resolve([])}
+
+     redis.zrevrange('leaderboard', myRank-2, myRank+3, (err, neighbours) => {
+      if(err) return reject(err)
+
+      if(!neighbours) return reject('neighbours from zrevrange is null')
+
+      collection.find({userId: {$in: neighbours} })
+       .project({ '_id': 0, 'userId': 1, 'userName': 1, 'score': 1, 'age': 1})
+       .toArray( (err, result) => {
+
+        if(err) return reject(err)
+
+        for(let i=0; i<result.length; i++) {
+         result[i].rank = myRank + 1
+        }
+
+        resolve(result)
+
+      })
+     })
+    })
+   })
+  })
+ })
+}
+
+exports.getRankChange = getRankChange
